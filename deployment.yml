@@ -1,0 +1,41 @@
+apiVersion : apps/v1
+kind : Deployment
+metadata : 
+  name : Blog
+spec :
+  selector:
+    matchLabels:
+      app : Blog-app
+  replicas : 2
+  template:
+    metadata :
+      labels:
+        app: Blog-app
+    spec:
+      containers:
+        - name : Blog-app
+          image : bhargavram2309/blogging:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort : 8080
+      imagePullSecrets:
+        - name: regcred
+
+
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: bloggingapp-ssvc
+spec:
+  selector:
+    app: Blog-app
+  ports:
+    - protocol: "TCP"
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
+              
+
