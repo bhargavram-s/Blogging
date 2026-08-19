@@ -23,9 +23,12 @@ pipeline {
             }
         }
 
-        stage('Trivy scan') {
+        stage('Trivy Filesystem Scan') {
             steps {
-                sh 'trivy fs --format table -o fs.html .'
+                sh '''
+                    export TMPDIR=/opt/trivy-tmp
+                    trivy fs --format table -o fs.html .
+                '''
             }
         }
 
@@ -56,24 +59,31 @@ pipeline {
 
         stage('Docker Build & Tag') {
             steps {
-                sh 'docker build -t bhargavram2309/blogging:${BUILD_NUMBER} .'
+                sh '''
+                    docker build \
+                    -t bhargavram2309/blogging:${BUILD_NUMBER} .
+                '''
             }
         }
 
-        stage('Trivy Scan') {
+        stage('Trivy Image Scan') {
             steps {
                 sh '''
                     export TMPDIR=/opt/trivy-tmp
-                    trivy image --format table \
-                        -o trivy-report.txt \
-                        bhargavram2309/blogging:${BUILD_NUMBER}
+
+                    trivy image \
+                    --format table \
+                    -o trivy-report.txt \
+                    bhargavram2309/blogging:${BUILD_NUMBER}
                 '''
             }
         }
 
         stage('Docker Push') {
             steps {
-                sh 'docker push bhargavram2309/blogging:${BUILD_NUMBER}'
+                sh '''
+                    docker push bhargavram2309/blogging:${BUILD_NUMBER}
+                '''
             }
         }
 
@@ -84,25 +94,67 @@ pipeline {
                         --zone us-central1-a \
                         --project project-8e71b0da-6039-4dfb-8b7
 
-                    sed -i "s|bhargavram2309/blogging:BUILD_NUMBER|bhargavram2309/blogging:${BUILD_NUMBER}|g" deployment.yml
+                    sed "s|bhargavram2309/blogging:BUILD_NUMBER|bhargavram2309/blogging:${BUILD_NUMBER}|g" \
+                        deployment.yml > deployment-temp.yml
 
-                    kubectl apply -f deployment.yml
+                    kubectl apply -f deployment-temp.yml
                 '''
             }
         }
     }
 
     post {
+
         success {
-            mail to: 'bhargavram824@gmail.com',
-                 subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Application deployed successfully to GKE."
+            emailext(
+                to: 'bhargavram824@gmail.com',
+                subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
+                    <h3>Build Successful</h3>
+
+                    <p><b>Job:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+
+                    <p>
+                        <b>Docker Image:</b>
+                        bhargavram2309/blogging:${env.BUILD_NUMBER}
+                    </p>
+
+                    <p>
+                        <a href="${env.BUILD_URL}console">
+                            View Jenkins Console Log
+                        </a>
+                    </p>
+
+                    <p>Application deployed successfully to GKE.</p>
+                """
+            )
         }
 
         failure {
-            mail to: 'bhargavram824@gmail.com',
-                 subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Build or deployment failed. Check Jenkins console logs."
+            emailext(
+                to: 'bhargavram824@gmail.com',
+                subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                mimeType: 'text/html',
+                body: """
+                    <h3>Build Failed</h3>
+
+                    <p><b>Job:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+
+                    <p>
+                        <a href="${env.BUILD_URL}console">
+                            View Jenkins Console Log
+                        </a>
+                    </p>
+
+                    <p>
+                        Build or deployment failed.
+                        Please check the Jenkins console logs.
+                    </p>
+                """
+            )
         }
     }
 }
