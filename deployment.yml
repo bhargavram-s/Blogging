@@ -14,7 +14,7 @@ spec :
     spec:
       containers:
         - name : blog-app
-          image : bhargavram2309/blogging:latest
+          image : bhargavram2309/blogging:BUILD_NUMBER
           imagePullPolicy: Always
           ports:
             - containerPort : 8080
