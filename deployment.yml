@@ -1,19 +1,19 @@
 apiVersion : apps/v1
 kind : Deployment
 metadata : 
-  name : Blog
+  name : blog
 spec :
   selector:
     matchLabels:
-      app : Blog-app
+      app : blog-app
   replicas : 2
   template:
     metadata :
       labels:
-        app: Blog-app
+        app: blog-app
     spec:
       containers:
-        - name : Blog-app
+        - name : blog-app
           image : bhargavram2309/blogging:latest
           imagePullPolicy: Always
           ports:
@@ -31,7 +31,7 @@ metadata:
   name: bloggingapp-ssvc
 spec:
   selector:
-    app: Blog-app
+    app: blog-app
   ports:
     - protocol: "TCP"
       port: 80
