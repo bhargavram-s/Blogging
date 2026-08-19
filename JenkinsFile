@@ -1,0 +1,83 @@
+pipeline {
+
+    agent any
+
+    tools {
+        maven 'MAVEN 3.9.12'
+    }
+
+    stages {
+        stage('Git Clone') {
+            steps {
+                git branch: 'main',
+                    changelog: false,
+                    poll: false,
+                    url: 'https://github.com/bhargavram-s/Blogging.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage('Trivy scan') {
+            steps {
+                sh 'trivy fs --format table -o fs.html .'
+            }
+        }
+        stage('Sonar Scan') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                sh '''
+                mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+                '''
+                }
+            }
+        }
+        stage('Deploy to Nexus') {
+            steps {
+                configFileProvider([
+                    configFile(
+                        fileId: 'maven-settings',
+                        variable: 'MAVEN_SETTINGS'
+                    )
+                ]) {
+                    sh '''
+                        mvn deploy -s "$MAVEN_SETTINGS"
+                    '''
+                }
+            }
+        }
+        stage('Docker Build & Tag') {
+            steps {
+                sh 'docker build -t bhargavram2309/blogging:${BUILD_NUMBER} .'
+            }
+        }
+        stage('Trivy Scan') {
+            steps { 
+            sh '''
+                export TMPDIR=/opt/trivy-tmp
+                trivy image --format table -o trivy-report.txt bhargavram2309/blogging:${BUILD_NUMBER}
+            '''
+            }
+        }
+        stage('Docker Push') {
+            steps {
+                sh 'docker push bhargavram2309/blogging:${BUILD_NUMBER}'
+            }
+        }
+        stage('Kubernetes Deployment') {
+            steps {
+            sh '''
+                gcloud container clusters get-credentials blog-gke-cluster \
+                --zone us-central1-a \
+                --project project-8e71b0da-6039-4dfb-8b7
+
+                sed -i "s|bhargavram2309/blogging:BUILD_NUMBER|bhargavram2309/blogging:${BUILD_NUMBER}|g" deployment.yml
+
+                kubectl apply -f deployment.yml
+            '''
+    }
+}
+    }
+}
